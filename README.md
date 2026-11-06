@@ -19,7 +19,7 @@ The full product spec, roadmap and decisions are in [`产品需求.md`](产品�
 
 ## Status
 
-MVP prototype (March – June 2026). The screens, map, auth, parked-car flow and alert UI are built. The warden-sighting service and database migrations are mid-refactor: the report and live-sighting flows need the service functions and table migrations brought back in line before a clean install works end to end.
+MVP prototype, built March – June 2026. Typecheck, tests and the web build pass in CI, and the Supabase migrations apply cleanly in order on a fresh database.
 
 ## Architecture
 
@@ -33,7 +33,9 @@ flowchart LR
 ## Engineering notes
 
 - **One codebase, three platforms:** Expo / React Native for iOS and Android, Expo web export for Vercel
-- **Database security:** a hardening migration enables row-level security, tightens public grants and adds user-owned policies
+- **Realtime:** new warden sightings are pushed to every open map through a Supabase realtime channel; each sighting expires after 30–60 minutes depending on how the warden is moving
+- **Database security:** row-level security on every table; users can only see active sightings and can only create or delete their own data
+- **Tests:** Jest tests for the warden-sighting service (Supabase mocked) and error logging
 - **CI:** GitHub Actions runs typecheck, tests and the web build on pushes and pull requests to `master`, with placeholder values only
 - **Security:** only the public anon key ships in the client; `service_role` never leaves the server
 
@@ -57,7 +59,11 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-key
 npm install
 npm start               # Expo dev server
 npm run build:web       # web export
+npm run typecheck
+npm test
 ```
+
+Apply the migrations in `supabase/migrations` to your Supabase project before first run.
 
 ## Author
 
