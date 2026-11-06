@@ -4,9 +4,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../contexts/AuthContext'
-import { LoadingScreen } from '../screens/common/LoadingScreen'
+import { LoadingScreen } from '../components/common/LoadingScreen'
 import { LoginScreen } from '../screens/auth/LoginScreen'
-import { SignUpScreen } from '../screens/auth/SignUpScreen'
+import { RegisterScreen } from '../screens/auth/RegisterScreen'
 import { MapScreen } from '../screens/map/MapScreen'
 import { SettingsScreen } from '../screens/settings/SettingsScreen'
 import { RootStackParamList, MainTabParamList } from '../types/navigation'
@@ -70,7 +70,7 @@ export default function AppNavigator() {
         ) : (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="SignUp" component={SignUpScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
           </>
         )}
       </Stack.Navigator>

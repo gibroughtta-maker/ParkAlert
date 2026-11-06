@@ -6,7 +6,7 @@ interface WebInteractiveMapProps {
   parkingLocation?: {
     latitude: number
     longitude: number
-    address?: string
+    address?: string | null
   } | null
   currentLocation?: {
     latitude: number

@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useParking } from '../../contexts/ParkingContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { WebInteractiveMap } from '../../components/common/WebInteractiveMap'
-import { LoadingScreen } from '../common/LoadingScreen'
+import { LoadingScreen } from '../../components/common/LoadingScreen'
 import { AlertModal } from '../../components/alerts/AlertModal'
 import { colors, spacing, typography, borderRadius, PARKING_CONSTANTS } from '../../constants'
 

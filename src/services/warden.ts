@@ -1,9 +1,155 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { ParkingLocation, LocationCoords, AlertLog } from '../types'
+import { RealtimeChannel } from '@supabase/supabase-js'
+import {
+  ParkingLocation,
+  AlertLog,
+  ParkedCar,
+  WardenSighting,
+  WardenType,
+  CountType,
+  DirectionType,
+  MovementType,
+} from '../types'
 import { supabase } from './supabase'
-import { LocationService } from './location'
 import { logger } from '../utils/logger'
-import { PARKING_CONSTANTS } from '../constants'
+import { PARKING_CONSTANTS, SIGHTING_EXPIRY_MINUTES } from '../constants'
+
+const WARDEN_SIGHTINGS_TABLE = 'warden_sightings'
+const PARKED_CARS_TABLE = 'parked_cars'
+
+export interface NewWardenSighting {
+  lat: number
+  lng: number
+  warden_type: WardenType
+  count: CountType
+  direction: DirectionType
+  movement: MovementType
+}
+
+export function getSightingExpiry(movement: MovementType, from: Date = new Date()): string {
+  const minutes = SIGHTING_EXPIRY_MINUTES[movement]
+  return new Date(from.getTime() + minutes * 60 * 1000).toISOString()
+}
+
+export async function getActiveWardenSightings(): Promise<WardenSighting[]> {
+  try {
+    const { data, error } = await supabase
+      .from(WARDEN_SIGHTINGS_TABLE)
+      .select('*')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data ?? []) as WardenSighting[]
+  } catch (error) {
+    logger.error('Error fetching active warden sightings:', error)
+    return []
+  }
+}
+
+export async function createWardenSighting(
+  sighting: NewWardenSighting,
+  userId: string
+): Promise<WardenSighting | null> {
+  try {
+    const { data, error } = await supabase
+      .from(WARDEN_SIGHTINGS_TABLE)
+      .insert({
+        ...sighting,
+        user_id: userId,
+        expires_at: getSightingExpiry(sighting.movement),
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data as WardenSighting
+  } catch (error) {
+    logger.error('Error creating warden sighting:', error)
+    return null
+  }
+}
+
+export function subscribeToWardenSightings(
+  onInsert: (sighting: WardenSighting) => void,
+  onDelete: (id: string) => void
+): RealtimeChannel {
+  return supabase
+    .channel('warden_sightings_changes')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: WARDEN_SIGHTINGS_TABLE },
+      (payload) => {
+        onInsert(payload.new as WardenSighting)
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: WARDEN_SIGHTINGS_TABLE },
+      (payload) => {
+        const id = (payload.old as Partial<WardenSighting>).id
+        if (id) onDelete(id)
+      }
+    )
+    .subscribe()
+}
+
+export async function getParkedCar(userId: string): Promise<ParkedCar | null> {
+  try {
+    const { data, error } = await supabase
+      .from(PARKED_CARS_TABLE)
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (error) throw error
+    return (data as ParkedCar | null) ?? null
+  } catch (error) {
+    logger.error('Error fetching parked car:', error)
+    return null
+  }
+}
+
+export async function setParkedCar(
+  location: { lat: number; lng: number },
+  userId: string
+): Promise<ParkedCar | null> {
+  try {
+    // One parked car per user: a new mark replaces the old one (产品需求.md §5.2)
+    const { data, error } = await supabase
+      .from(PARKED_CARS_TABLE)
+      .upsert(
+        {
+          user_id: userId,
+          lat: location.lat,
+          lng: location.lng,
+          radius_m: PARKING_CONSTANTS.ALERT_RADIUS_METERS,
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
+      .select()
+      .single()
+
+    if (error) throw error
+    return data as ParkedCar
+  } catch (error) {
+    logger.error('Error saving parked car:', error)
+    return null
+  }
+}
+
+export async function removeParkedCar(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from(PARKED_CARS_TABLE)
+    .delete()
+    .eq('user_id', userId)
+
+  if (error) {
+    logger.error('Error removing parked car:', error)
+    throw error
+  }
+}
 
 export class WardenService {
   private static alertCooldownKey = 'last_alert_time'
